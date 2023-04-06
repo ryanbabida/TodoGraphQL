@@ -2,6 +2,7 @@
 
 To run the project:
 ```
+cd TodosApi
 dotnet run
 ```
 
