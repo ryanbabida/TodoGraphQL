@@ -25,9 +25,9 @@ class Program
 
         app.MapGraphQL();
 
-        app.MapGet("/todos", (ITodoService todoService) =>
+        app.MapGet("/todos", async (ITodoService todoService) =>
         {
-            return todoService.GetTodos();
+            return await todoService.GetTodosAsync();
         });
 
         app.Run();
@@ -42,7 +42,8 @@ public class Todo
 
 public enum Status
 {
-    Incomplete = 0,
+    Unknown,
+    Incomplete,
     InProgress,
     Done
 }
@@ -73,23 +74,23 @@ public class TodoService : ITodoService
         TodoDataStore = todoDataStore;
     }
 
-    public IResult GetTodos()
+    public async Task<IResult> GetTodosAsync()
     {
-        var todos = TodoDataStore.GetTodosAsync().Result;
+        var todos = await TodoDataStore.GetTodosAsync();
         return Results.Ok(todos);
     }
 
-    public IResult AddTodo(string name)
+    public async Task<IResult> AddTodoAsync(string name)
     {
-        var todo = TodoDataStore.AddTodoAsync(name).Result;
+        var todo = await TodoDataStore.AddTodoAsync(name);
         return Results.Created("", todo);
     }
 }
 
 public interface ITodoService
 {
-    public IResult GetTodos();
-    public IResult AddTodo(string name);
+    public Task<IResult> GetTodosAsync();
+    public Task<IResult> AddTodoAsync(string name);
 }
 
 public class MockTodoDataStore : ITodoDataStore
