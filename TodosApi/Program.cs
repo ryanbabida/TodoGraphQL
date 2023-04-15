@@ -52,7 +52,7 @@ public class Query
     public List<Todo> GetTodos()
     {
         var todos = new TodoDataStore();
-        return todos.GetTodos().Result;
+        return todos.GetTodosAsync().Result;
     }
 }
 
@@ -61,7 +61,7 @@ public class Mutation
     public Todo AddTodo(string name)
     {
         var todos = new TodoDataStore();
-        return todos.AddTodo(name).Result;
+        return todos.AddTodoAsync(name).Result;
     }
 }
 
@@ -75,13 +75,13 @@ public class TodoService : ITodoService
 
     public IResult GetTodos()
     {
-        var todos = TodoDataStore.GetTodos().Result;
+        var todos = TodoDataStore.GetTodosAsync().Result;
         return Results.Ok(todos);
     }
 
     public IResult AddTodo(string name)
     {
-        var todo = TodoDataStore.AddTodo(name).Result;
+        var todo = TodoDataStore.AddTodoAsync(name).Result;
         return Results.Created("", todo);
     }
 }
@@ -94,12 +94,12 @@ public interface ITodoService
 
 public class MockTodoDataStore : ITodoDataStore
 {
-    public Task<List<Todo>> GetTodos()
+    public Task<List<Todo>> GetTodosAsync()
     {
         return Task.FromResult(Program._Todos);
     }
 
-    public Task<Todo> AddTodo(string name)
+    public Task<Todo> AddTodoAsync(string name)
     {
         var todo = new Todo { Name = name };
         Program._Todos.Add(todo);
@@ -109,7 +109,7 @@ public class MockTodoDataStore : ITodoDataStore
 
 public class TodoDataStore : ITodoDataStore
 {
-    public async Task<List<Todo>> GetTodos()
+    public async Task<List<Todo>> GetTodosAsync()
     {
         using var appContext = new AppContext();
         var todoEntities = await appContext.Todos.ToListAsync();
@@ -119,7 +119,7 @@ public class TodoDataStore : ITodoDataStore
             .ToList();
     }
 
-    public async Task<Todo> AddTodo(string name)
+    public async Task<Todo> AddTodoAsync(string name)
     {
         using var appContext = new AppContext();
         var todoEntity = new TodoEntity() { Name = name };
@@ -132,8 +132,8 @@ public class TodoDataStore : ITodoDataStore
 
 public interface ITodoDataStore
 {
-    public Task<List<Todo>> GetTodos();
-    public Task<Todo> AddTodo(string name);
+    public Task<List<Todo>> GetTodosAsync();
+    public Task<Todo> AddTodoAsync(string name);
 }
 
 public class AppContext : DbContext
