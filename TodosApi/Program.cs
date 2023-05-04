@@ -14,9 +14,8 @@ class Program
         var builder = WebApplication.CreateBuilder(args);
 
         builder.Services
-            .AddScoped<ITodoService>(
-                ts => new TodoService(new TodoDataStore()))
-            .AddDbContext<AppContext>()
+            .AddScoped<ITodoDataStore, TodoDataStore>()
+            .AddScoped<ITodoService, TodoService>()
             .AddGraphQLServer()
             .AddQueryType<Query>()
             .AddMutationType<Mutation>();
@@ -50,19 +49,17 @@ public enum Status
 
 public class Query
 {
-    public List<Todo> GetTodos()
+    public List<Todo> GetTodos([Service] ITodoDataStore dataStore)
     {
-        var todos = new TodoDataStore();
-        return todos.GetTodosAsync().Result;
+        return dataStore.GetTodosAsync().Result;
     }
 }
 
 public class Mutation
 {
-    public Todo AddTodo(string name)
+    public Todo AddTodo([Service] ITodoDataStore dataStore, string name)
     {
-        var todos = new TodoDataStore();
-        return todos.AddTodoAsync(name).Result;
+        return dataStore.AddTodoAsync(name).Result;
     }
 }
 
