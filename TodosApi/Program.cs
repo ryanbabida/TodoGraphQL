@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations.Schema;
+using HotChocolate.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using OpenTelemetry.Trace;
 
@@ -20,7 +21,16 @@ internal sealed class Program
             .AddScoped<ITodoService, TodoService>()
             .AddGraphQLServer()
             .AddQueryType<Query>()
-            .AddMutationType<Mutation>();
+            .AddMutationType<Mutation>()
+            .AddInstrumentation(options =>
+                {
+                    options.RenameRootActivity = true;
+                    options.IncludeDocument = true;
+                    options.Scopes = ActivityScopes.All;
+                    options.IncludeDataLoaderKeys = true;
+                    options.RequestDetails = RequestDetails.All;
+                }
+            );
 
         builder.Services
             .AddOpenTelemetry()
@@ -28,14 +38,17 @@ internal sealed class Program
                 builder =>
                     builder
                         .AddSource("Todos")
-                        .AddAspNetCoreInstrumentation()
+                        .AddAspNetCoreInstrumentation(options =>
+                            {
+                                options.RecordException = true;
+                            })
                         .AddHttpClientInstrumentation()
                         .AddSqlClientInstrumentation(options =>
-                        {
-                            options.SetDbStatementForText = true;
-                            options.SetDbStatementForStoredProcedure = true;
-                            options.RecordException = true;
-                        })
+                            {
+                                options.SetDbStatementForText = true;
+                                options.SetDbStatementForStoredProcedure = true;
+                                options.RecordException = true;
+                            })
                         .AddOtlpExporter(options =>
                             options.Endpoint = new Uri("http://localhost:4317"))
                         .AddConsoleExporter()
