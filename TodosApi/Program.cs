@@ -1,31 +1,51 @@
-using System.ComponentModel.DataAnnotations.Schema;
+﻿using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.EntityFrameworkCore;
+using OpenTelemetry.Trace;
 
 internal sealed class Program
 {
-    public static List<Todo> _Todos = new()
-    {
-        new Todo { Name = "Make breakfast" },
-        new Todo { Name = "Study GraphQL" }
-    };
+    public static List<Todo> _Todos =
+        new()
+        {
+            new Todo { Name = "Make breakfast" },
+            new Todo { Name = "Study GraphQL" }
+        };
 
     private static void Main(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
 
         builder.Services
-            .AddScoped<ITodoDataStore, MockTodoDataStore>()
+            .AddScoped<ITodoDataStore, TodoDataStore>()
             .AddScoped<ITodoService, TodoService>()
             .AddGraphQLServer()
             .AddQueryType<Query>()
             .AddMutationType<Mutation>();
 
+        builder.Services
+            .AddOpenTelemetry()
+            .WithTracing(
+                builder =>
+                    builder
+                        .AddSource("Todos")
+                        .AddAspNetCoreInstrumentation()
+                        .AddHttpClientInstrumentation()
+                        .AddSqlClientInstrumentation(options =>
+                        {
+                            options.SetDbStatementForText = true;
+                            options.SetDbStatementForStoredProcedure = true;
+                            options.RecordException = true;
+                        })
+                        .AddOtlpExporter(options =>
+                            options.Endpoint = new Uri("http://localhost:4317"))
+                        .AddConsoleExporter()
+            );
+
         var app = builder.Build();
 
         app.MapGraphQL();
 
-        app.MapGet("/todos", async (ITodoService todoService)
-            => await todoService.GetTodosAsync());
+        app.MapGet("/todos", async (ITodoService todoService) => await todoService.GetTodosAsync());
 
         app.Run();
     }
@@ -47,18 +67,20 @@ public enum Status
 
 public class Query
 {
-    public List<Todo> GetTodos([Service] ITodoDataStore dataStore) 
-        => dataStore.GetTodosAsync().Result;
+    public List<Todo> GetTodos([Service] ITodoDataStore dataStore) =>
+        dataStore.GetTodosAsync().Result;
 }
 
 public class Mutation
 {
-    public Todo AddTodo([Service] ITodoDataStore dataStore, string name) => dataStore.AddTodoAsync(name).Result;
+    public Todo AddTodo([Service] ITodoDataStore dataStore, string name) =>
+        dataStore.AddTodoAsync(name).Result;
 }
 
 public class TodoService : ITodoService
 {
     private ITodoDataStore TodoDataStore { get; set; }
+
     public TodoService(ITodoDataStore todoDataStore) => this.TodoDataStore = todoDataStore;
 
     public async Task<IResult> GetTodosAsync()
@@ -100,11 +122,7 @@ public class TodoDataStore : ITodoDataStore
         var todoEntities = await appContext.Todos.ToListAsync();
 
         return todoEntities
-            .Select(te => new Todo
-            {
-                Name = te.Name,
-                Status = (Status)te.Status
-            })
+            .Select(te => new Todo { Name = te.Name, Status = (Status)te.Status })
             .ToList();
     }
 
@@ -129,7 +147,8 @@ public class AppContext : DbContext
 {
     public DbSet<TodoEntity> Todos => this.Set<TodoEntity>();
 
-    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder) => optionsBuilder.UseSqlServer(
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder) =>
+        optionsBuilder.UseSqlServer(
             "Server=localhost,57000;Database=App;User Id=sa;Password=pa33word!;TrustServerCertificate=True;"
         );
 }
